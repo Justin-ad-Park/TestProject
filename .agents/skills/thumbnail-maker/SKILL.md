@@ -61,7 +61,7 @@ This skill must preserve the current thumbnail-making process unless the project
 
 - Use `scripts/create_thumbnail.swift` as the standard thumbnail generation script.
 - Use the configured logo asset as the source of truth.
-- If the logo asset is SVG and a rasterized working copy is needed for composition, generate a PNG working copy first and then compose with that PNG.
+- If the logo asset is SVG, render it directly to a transparent raster at the target logo width before composition.
 - Draw labels directly onto the final thumbnail canvas at composition time.
 - Do not depend on pre-rendered label PNG assets for final label rendering.
 
@@ -91,7 +91,7 @@ This skill must preserve the current thumbnail-making process unless the project
 13. Compute label placement from the final visible label box, not from a pre-rendered raster asset.
 14. Keep label interior transparent by default. Draw only the label border and text unless the project explicitly adopts a fill rule.
 15. Preserve transparency outside the label box during composition. Do not replace transparent outer pixels with white.
-16. Prefer a transparent logo source asset or transparent rasterization path. If the working logo raster contains a near-white background, remove that background before composition.
+16. Prefer a transparent logo source asset or direct transparent SVG rasterization at the target logo width. If a fallback working logo raster contains a near-white background, remove that background before composition.
 17. Export the result as PNG by default.
 
 ### Do not change these behaviors by default

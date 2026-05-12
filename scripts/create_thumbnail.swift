@@ -29,6 +29,34 @@ struct LabelSpec {
     let textColor: CGColor
 }
 
+func renderSVGLogoIfNeeded(sourcePath: String, targetWidth: Int) -> String? {
+    guard sourcePath.lowercased().hasSuffix(".svg") else { return sourcePath }
+
+    let fileManager = FileManager.default
+    let cwd = fileManager.currentDirectoryPath
+    let rendererScriptPath = URL(fileURLWithPath: cwd)
+        .appendingPathComponent("scripts/render_svg_logo.swift").path
+    let outputPath = URL(fileURLWithPath: cwd)
+        .appendingPathComponent("outputs/tmp_logo")
+        .appendingPathComponent("rendered-logo-\(targetWidth).png").path
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+    process.arguments = [rendererScriptPath, sourcePath, outputPath, String(targetWidth)]
+    process.standardOutput = Pipe()
+    process.standardError = Pipe()
+
+    do {
+        try process.run()
+        process.waitUntilExit()
+    } catch {
+        return nil
+    }
+
+    guard process.terminationStatus == 0 else { return nil }
+    return outputPath
+}
+
 func parseArgs() -> Args? {
     let values = Array(CommandLine.arguments.dropFirst())
     guard values.count == 8 || values.count >= 12 else { return nil }
@@ -317,7 +345,9 @@ guard let sourceImage = loadCGImage(at: args.sourcePath) else {
     exit(1)
 }
 
-guard let loadedLogoImage = loadCGImage(at: args.logoPath) else {
+let resolvedLogoPath = renderSVGLogoIfNeeded(sourcePath: args.logoPath, targetWidth: args.logoWidth) ?? args.logoPath
+
+guard let loadedLogoImage = loadCGImage(at: resolvedLogoPath) else {
     fputs("failed to load logo image\n", stderr)
     exit(1)
 }

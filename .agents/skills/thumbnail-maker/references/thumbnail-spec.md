@@ -45,7 +45,7 @@
 - If no colors are requested, label border and text are rendered in black.
 - If colors are requested, they are applied per label.
 - Label interior is transparent by default.
-- The preferred logo path is a transparent SVG or transparent rasterization result. If a working logo PNG contains a near-white background, remove it before composition.
+- The preferred logo path is direct SVG rasterization to a transparent PNG at the target logo width. If a fallback working logo PNG contains a near-white background, remove it before composition.
 - The locked standard execution script is `scripts/create_thumbnail.swift`.
 - If channel-specific thumbnail variants are added later, split them into separate config files instead of editing instructions inline.
 - If crop behavior becomes important, define it explicitly here and mirror it in the skill instructions.
