@@ -36,6 +36,8 @@ Use this file as the source of truth for:
 - label horizontal padding
 - label font size ratio
 - supported label keywords
+- default label border color
+- default label text color
 
 ## Workflow
 
@@ -43,7 +45,7 @@ Use this file as the source of truth for:
 2. Load `.agents/skills/thumbnail-maker/config/thumbnail.toml`.
 3. Confirm that the logo asset exists at the configured path.
 4. Detect whether the user requested `free_shipping`, `mix_and_match_discount`, custom label text, both, or no labels.
-5. Resolve built-in label keywords into display text and preserve any custom label text as provided.
+5. Resolve built-in label keywords into display text, preserve any custom label text as provided, and apply per-label color overrides when requested.
 6. Follow the fixed thumbnail process described in `## Locked Execution Process`.
 7. Determine the save directory from `output_root_dir` and `output_subdir_pattern`.
 8. Determine the output filename from `filename_rule`.
@@ -84,9 +86,13 @@ This skill must preserve the current thumbnail-making process unless the project
    - start the second label at `first_label.right + configured label_gap`
 9. Compute each label box width from its text width plus configured horizontal padding.
 10. Compute each label box height from `label_height_mode`.
-11. Compute label placement from the final visible label box, not from a pre-rendered raster asset.
-12. Preserve transparency outside the label box during composition. Do not replace transparent outer pixels with white.
-12. Export the result as PNG by default.
+11. Use black for both border color and text color when the user does not request colors explicitly.
+12. If the user requests border color or text color for a specific label, render that label with the requested color values.
+13. Compute label placement from the final visible label box, not from a pre-rendered raster asset.
+14. Keep label interior transparent by default. Draw only the label border and text unless the project explicitly adopts a fill rule.
+15. Preserve transparency outside the label box during composition. Do not replace transparent outer pixels with white.
+16. Prefer a transparent logo source asset or transparent rasterization path. If the working logo raster contains a near-white background, remove that background before composition.
+17. Export the result as PNG by default.
 
 ### Do not change these behaviors by default
 
@@ -100,6 +106,8 @@ This skill must preserve the current thumbnail-making process unless the project
 - Treat `free_shipping` as display text `무료배송`.
 - Treat `mix_and_match_discount` as display text `골라담아할인`.
 - If the user provides custom label text, render that text directly inside the label box.
+- If the user does not request colors, render label border and text in black.
+- If the user requests colors, apply them per label.
 - Do not replace the Swift composition script with another implementation path unless the project intentionally updates the standard process.
 - Do not change the save path convention unless the configuration is intentionally updated.
 
@@ -118,6 +126,7 @@ This skill must preserve the current thumbnail-making process unless the project
 - Treat `label_bottom` as the visible label box bottom offset from the thumbnail bottom edge.
 - Compute label width from rendered text width plus `label_horizontal_padding`.
 - Compute label font size from the label height and `label_font_size_ratio`.
+- Parse optional label colors from `labelText|borderColor|textColor`.
 - When `filename_rule = "timestamp"`, use `filename_timestamp_pattern`.
 - When `filename_rule = "source_name"`, derive the filename from the source image name, sanitize unsafe characters, and apply `filename_source_pattern`.
 
@@ -126,6 +135,7 @@ This skill must preserve the current thumbnail-making process unless the project
 - If no source image is attached, ask for the image.
 - If the logo asset is unavailable, report the missing asset path clearly.
 - If the user requests a built-in label keyword that is unsupported, report the unsupported keyword clearly.
+- If a requested label color is invalid, report the invalid color string clearly.
 - If the requested output conflicts with the configuration, state the conflict and ask whether to update the configuration or override only for the current run.
 - If the source image has no usable filename and `filename_rule = "source_name"`, fall back to the timestamp filename rule.
 

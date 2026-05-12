@@ -17,3 +17,5 @@ label_height_mode = "match_logo_height"
 label_horizontal_padding = 18
 label_font_size_ratio = 0.44
 supported_label_keywords = ["free_shipping", "mix_and_match_discount"]
+default_label_border_color = "#000000"
+default_label_text_color = "#000000"

@@ -4,6 +4,10 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
+let rgbaBitmapInfo = CGBitmapInfo.byteOrder32Big.union(
+    CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+)
+
 struct Args {
     let sourcePath: String
     let logoPath: String
@@ -17,6 +21,12 @@ struct Args {
     let labelBottom: Int?
     let labelGap: Int?
     let labelTexts: [String]
+}
+
+struct LabelSpec {
+    let text: String
+    let borderColor: CGColor
+    let textColor: CGColor
 }
 
 func parseArgs() -> Args? {
@@ -111,7 +121,7 @@ func trimmedImage(_ image: CGImage) -> CGImage? {
         bitsPerComponent: bitsPerComponent,
         bytesPerRow: bytesPerRow,
         space: colorSpace,
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        bitmapInfo: rgbaBitmapInfo.rawValue
     ) else {
         return image
     }
@@ -150,6 +160,57 @@ func trimmedImage(_ image: CGImage) -> CGImage? {
     return image.cropping(to: trimRect)
 }
 
+func imageByRemovingNearWhiteBackground(
+    _ image: CGImage,
+    threshold: UInt8 = 245
+) -> CGImage? {
+    let width = image.width
+    let height = image.height
+    let bytesPerPixel = 4
+    let bytesPerRow = width * bytesPerPixel
+
+    guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return image }
+    guard let context = CGContext(
+        data: nil,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: colorSpace,
+        bitmapInfo: rgbaBitmapInfo.rawValue
+    ) else {
+        return image
+    }
+
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+    guard let data = context.data else { return image }
+    let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * bytesPerPixel)
+
+    for y in 0..<height {
+        for x in 0..<width {
+            let offset = y * bytesPerRow + x * bytesPerPixel
+            let red = pixels[offset]
+            let green = pixels[offset + 1]
+            let blue = pixels[offset + 2]
+            let alpha = pixels[offset + 3]
+
+            if alpha == 0 {
+                continue
+            }
+
+            if red >= threshold, green >= threshold, blue >= threshold {
+                pixels[offset] = 0
+                pixels[offset + 1] = 0
+                pixels[offset + 2] = 0
+                pixels[offset + 3] = 0
+            }
+        }
+    }
+
+    return context.makeImage()
+}
+
 func resolveLabelText(_ raw: String) -> String {
     switch raw.lowercased() {
     case "free_shipping":
@@ -161,6 +222,40 @@ func resolveLabelText(_ raw: String) -> String {
     }
 }
 
+func colorFromHex(_ raw: String) -> CGColor? {
+    let hex = raw.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
+    guard hex.count == 6, let value = Int(hex, radix: 16) else { return nil }
+    let red = CGFloat((value >> 16) & 0xFF) / 255.0
+    let green = CGFloat((value >> 8) & 0xFF) / 255.0
+    let blue = CGFloat(value & 0xFF) / 255.0
+    return CGColor(red: red, green: green, blue: blue, alpha: 1.0)
+}
+
+func parseLabelSpec(_ raw: String) -> LabelSpec? {
+    let parts = raw.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+    guard let first = parts.first, !first.isEmpty else { return nil }
+
+    let defaultBlack = CGColor(red: 0, green: 0, blue: 0, alpha: 1.0)
+    var borderColor = defaultBlack
+    var textColor = defaultBlack
+
+    if parts.count >= 2, !parts[1].isEmpty {
+        guard let parsed = colorFromHex(parts[1]) else { return nil }
+        borderColor = parsed
+    }
+
+    if parts.count >= 3, !parts[2].isEmpty {
+        guard let parsed = colorFromHex(parts[2]) else { return nil }
+        textColor = parsed
+    }
+
+    return LabelSpec(
+        text: resolveLabelText(first),
+        borderColor: borderColor,
+        textColor: textColor
+    )
+}
+
 func labelFontSize(for height: CGFloat) -> CGFloat {
     max(12, round(height * 0.44))
 }
@@ -169,12 +264,12 @@ func labelHorizontalPadding(for height: CGFloat) -> CGFloat {
     max(12, round(height * 0.31))
 }
 
-func makeLabelLine(_ text: String, fontSize: CGFloat) -> CTLine {
+func makeLabelLine(_ text: String, fontSize: CGFloat, textColor: CGColor) -> CTLine {
     let font = CTFontCreateUIFontForLanguage(.system, fontSize, nil)
         ?? CTFontCreateWithName("AppleSDGothicNeo-Bold" as CFString, fontSize, nil)
     let attributes: [NSAttributedString.Key: Any] = [
         NSAttributedString.Key(rawValue: kCTFontAttributeName as String): font,
-        NSAttributedString.Key(rawValue: kCTForegroundColorAttributeName as String): CGColor(gray: 0.33, alpha: 1.0),
+        NSAttributedString.Key(rawValue: kCTForegroundColorAttributeName as String): textColor,
     ]
     let attributed = NSAttributedString(string: text, attributes: attributes)
     return CTLineCreateWithAttributedString(attributed)
@@ -182,14 +277,13 @@ func makeLabelLine(_ text: String, fontSize: CGFloat) -> CTLine {
 
 func drawLabel(
     in context: CGContext,
-    text: String,
+    spec: LabelSpec,
     origin: CGPoint,
     height: CGFloat
 ) -> CGFloat {
-    let resolvedText = resolveLabelText(text)
     let fontSize = labelFontSize(for: height)
     let horizontalPadding = labelHorizontalPadding(for: height)
-    let line = makeLabelLine(resolvedText, fontSize: fontSize)
+    let line = makeLabelLine(spec.text, fontSize: fontSize, textColor: spec.textColor)
 
     var ascent: CGFloat = 0
     var descent: CGFloat = 0
@@ -199,9 +293,7 @@ func drawLabel(
     let rect = CGRect(x: origin.x, y: origin.y, width: labelWidth, height: height)
 
     context.saveGState()
-    context.setFillColor(CGColor.white)
-    context.fill(rect)
-    context.setStrokeColor(CGColor(gray: 0.42, alpha: 1.0))
+    context.setStrokeColor(spec.borderColor)
     context.setLineWidth(2)
     context.stroke(rect.insetBy(dx: 1, dy: 1))
 
@@ -225,14 +317,15 @@ guard let sourceImage = loadCGImage(at: args.sourcePath) else {
     exit(1)
 }
 
-guard let rawLogoImage = loadCGImage(at: args.logoPath) else {
+guard let loadedLogoImage = loadCGImage(at: args.logoPath) else {
     fputs("failed to load logo image\n", stderr)
     exit(1)
 }
-let logoImage = trimmedImage(rawLogoImage) ?? rawLogoImage
+let logoWithoutWhiteBackground = imageByRemovingNearWhiteBackground(loadedLogoImage) ?? loadedLogoImage
+let logoImage = trimmedImage(logoWithoutWhiteBackground) ?? logoWithoutWhiteBackground
 
 let colorSpace = CGColorSpaceCreateDeviceRGB()
-let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+let bitmapInfo = rgbaBitmapInfo.rawValue
 
 guard let context = CGContext(
     data: nil,
@@ -278,11 +371,16 @@ if !args.labelTexts.isEmpty {
     var currentX = labelLeft
 
     for labelText in args.labelTexts {
+        guard let labelSpec = parseLabelSpec(labelText) else {
+            fputs("failed to parse label spec: \(labelText)\n", stderr)
+            exit(1)
+        }
+
         let scaledLabelHeight = CGFloat(logoHeight)
         let labelY = CGFloat(labelBottom)
         let usedWidth = drawLabel(
             in: context,
-            text: labelText,
+            spec: labelSpec,
             origin: CGPoint(x: CGFloat(currentX), y: labelY),
             height: scaledLabelHeight
         )

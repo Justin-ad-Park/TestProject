@@ -17,6 +17,9 @@
 - Label horizontal padding: `18px` on each side
 - Label font size rule: `label height * 0.44`
 - Supported built-in label keywords: `free_shipping`, `mix_and_match_discount`
+- Default label border color: `#000000`
+- Default label text color: `#000000`
+- Per-label color input format: `labelText|borderColor|textColor`
 - Default output format: `png`
 - Output root directory: `outputs/thumbnails`
 - Output subdirectory pattern: `YYYYMM/DD`
@@ -39,6 +42,10 @@
   - `free_shipping` -> `무료배송`
   - `mix_and_match_discount` -> `골라담아할인`
 - Custom label text is rendered directly at final composition time.
+- If no colors are requested, label border and text are rendered in black.
+- If colors are requested, they are applied per label.
+- Label interior is transparent by default.
+- The preferred logo path is a transparent SVG or transparent rasterization result. If a working logo PNG contains a near-white background, remove it before composition.
 - The locked standard execution script is `scripts/create_thumbnail.swift`.
 - If channel-specific thumbnail variants are added later, split them into separate config files instead of editing instructions inline.
 - If crop behavior becomes important, define it explicitly here and mirror it in the skill instructions.
