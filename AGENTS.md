@@ -1,4 +1,4 @@
-# CODEX.md
+# AGENTS.md
 
 ## 프로젝트 개요
 
@@ -31,10 +31,20 @@
 
 ---
 
+## 당직표 작업 규칙
+
+- 당직표 작성, 당직 보고 메일 정리, 사업장별 근무현황 반영 요청은 `dangjik-html-formatter` 스킬을 우선 사용한다.
+- 당직표 작업의 실행 기준 문서는 `.agents/skills/dangjik-html-formatter/SKILL.md` 하나로 본다.
+- 기존 HTML 표 구조, 메일 문구, 행 순서, `pending` 처리 방식은 스킬 정의를 기준으로 유지한다.
+- 오전/오후 재보고가 함께 있을 때는 스킬의 업데이트 규칙을 따른다.
+- 당직표 기본 출력 경로는 `outputs/dangjik/YYYYMMDD/YYYYMMDD_당직표.html` 로 본다.
+
+---
+
 ## 파일 연결 구조
 
 ```text
-/CODEX.md
+/AGENTS.md
 /.codex/agents/thumbnail_maker.toml
 /.agents/skills/thumbnail-maker/SKILL.md
 /.agents/skills/thumbnail-maker/SKILL.ko.md
@@ -54,7 +64,7 @@
 
 썸네일 관련 작업을 다룰 때는 아래 순서로 문맥을 이해한다.
 
-1. `CODEX.md`
+1. `AGENTS.md`
 2. `.codex/agents/thumbnail_maker.toml`
 3. `.agents/skills/thumbnail-maker/SKILL.md`
 4. `.agents/skills/thumbnail-maker/config/thumbnail.toml`
@@ -62,6 +72,12 @@
 
 주의:
 `.agents/skills/thumbnail-maker/SKILL.ko.md`는 사람용 설명 파일이며, 에이전트의 실행 지침 우선순위에 포함하지 않는다.
+
+당직표 관련 작업을 다룰 때는 아래 순서로 문맥을 이해한다.
+
+1. `AGENTS.md`
+2. `.agents/skills/dangjik-html-formatter/SKILL.md`
+3. `.agents/skills/dangjik-html-formatter/assets/dangjik_empty_template.html`
 
 ---
 
